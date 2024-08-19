@@ -48,6 +48,47 @@ def search_create_ops(start_dict: Dict[str, Files], end_dict: Dict[str, Files]) 
 
     return result
 
+# Function use in order to search delete operations between two dates.
+def search_delete_ops(start_dict: Dict[str, Files], end_dict: Dict[str, Files]) -> List[Response]:
+    result = []
+    operations = []
+    
+    for file_id, file in start_dict.items():
+        if file_id not in end_dict:
+            operations.append({"file": file.model_dump()})
+
+    result.append({"operationType": "Delete Files Operations", "count": len(operations), "objects": operations})
+
+    return result
+
+# Function use in order to search update operations between two dates.
+def search_update_ops(start_dict: Dict[str, Files], end_dict: Dict[str, Files]) -> List[Response]:
+    result = []
+    operations = []
+
+    for file_id, file in end_dict.items():
+        if file_id in start_dict:
+            start_file = start_dict[file_id]
+            if file.name != start_file.name and file.meta != start_file.meta:
+                operations.append({
+                    "updateType": "updateCompleteFile",
+                    "file": file.model_dump()
+                })
+            elif file.name != start_file.name:
+                operations.append({
+                    "updateType": "updateFileName",
+                    "file": file.model_dump()
+                })
+            elif file.meta != start_file.meta:
+                operations.append({
+                    "updateType": "updateFileMeta",
+                    "file": file.model_dump()
+                })
+
+    result.append({"operationType": "Update Files Operations", "count": len(operations), "objects": operations})
+
+    return result
+
 # Exposing GET endpoint that compares two dates.
 @app.get("/syncTwoDates")
 def sync_files_two_dates(start_date: str, end_date: str) -> SyncTwoDates_Response:
@@ -57,6 +98,9 @@ def sync_files_two_dates(start_date: str, end_date: str) -> SyncTwoDates_Respons
     start_dict = {file.id: file for file in start_files}
     end_dict = {file.id: file for file in end_files}
     
-    operations = search_create_ops(start_dict, end_dict)
+    operations = []
+    operations.extend(search_create_ops(start_dict, end_dict))
+    operations.extend(search_delete_ops(start_dict, end_dict))
+    operations.extend(search_update_ops(start_dict, end_dict))
 
     return {"message": f"Operations made from {start_date} to {end_date}.","operations": operations}
