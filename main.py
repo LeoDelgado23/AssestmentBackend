@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from typing import List, Dict, Any
 import json
 from pathlib import Path
+from datetime import datetime
 
 # Initializing the application server.
 app = FastAPI()
@@ -34,6 +35,17 @@ def load_files(path: str) -> List[Files]:
             return [Files(**json.loads(line)) for line in file]
     except Exception as e:
         raise HTTPException(status_code = 500, detail = f"An error occurred >> Executing Load Files Function : {str(e)}")
+
+# Function use for validating dates structure and logic.
+def validate_dates(start_date: str, end_date: str):
+    try:
+        start = datetime.strptime(start_date, "%Y-%m-%d")
+        end = datetime.strptime(end_date, "%Y-%m-%d")
+        
+        if start >= end:
+            raise HTTPException(status_code = 400, detail = "End date must be later than start date.")
+    except ValueError:
+        raise HTTPException(status_code = 400, detail = "Invalid date format. Use YYYY-MM-DD.")
 
 # Function use in order to search create operations between two dates.
 def search_create_ops(start_dict: Dict[str, Files], end_dict: Dict[str, Files]) -> List[Response]:
@@ -92,6 +104,8 @@ def search_update_ops(start_dict: Dict[str, Files], end_dict: Dict[str, Files]) 
 # Exposing GET endpoint that compares two dates.
 @app.get("/syncTwoDates")
 def sync_files_two_dates(start_date: str, end_date: str) -> SyncTwoDates_Response:
+    validate_dates(start_date, end_date)
+
     start_files = load_files(start_date)
     end_files = load_files(end_date)
 
